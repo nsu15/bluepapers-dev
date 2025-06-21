@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TheBluePapers.ai</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #4169E1;
+            font-family: 'Playfair Display', serif;
+            color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+        }
+        h1 {
+            color: white;
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        .prompt-container {
+            max-width: 520px;
+            background: white;
+            padding: 2rem;
+            border-radius: 1.25rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .prompt-input {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1rem;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+            margin-bottom: 1.5rem;
+            box-sizing: border-box;
+        }
+        .submit-btn {
+            background-color: #4169E1;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            font-size: 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 600;
+        }
+        .submit-btn:hover {
+            background-color: #2f4cb1;
+        }
+        .result-container {
+            max-width: 520px;
+            margin-top: 2rem;
+            background: white;
+            padding: 2rem;
+            border-radius: 1.25rem;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+        }
+        .ai-explanation {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+        }
+        .rv-card {
+            padding: 1rem 0;
+            border-bottom: 1px solid #d4af37;
+        }
+        .rv-card:last-child {
+            border-bottom: none;
+        }
+        .rv-card strong {
+            font-size: 1.1rem;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+        .rv-card span {
+            display: block;
+            color: #555;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>Welcome</h1>
+    <form class="prompt-container" method="POST">
+    <select name="mode" style="margin-bottom: 1rem; width: 100%; padding: 0.6rem; border-radius: 10px;">
+        <option value="hope">Hope – Search for affordable housing options that fit your needs.</option>
+        <option value="everyday_answers">Everyday Answers – Facing a housing challenge? Get practical, compassionate help.</option>
+        <option value="talk_to_me">Talk To Me – Need encouragement? Simple advice? Let's figure this out together.</option>
+    </select>
+    <input class="prompt-input" type="text" name="query" placeholder="Ex: I'm looking to start over. I have 3 days to find a place..." required>
+
+    <!-- Move the mic button here -->
+    <button id="mic-button" class="submit-btn" type="button" style="margin-bottom: 1rem;">🎤 I'm Here To Listen To You.</button>
+
+    <!-- Then the form submit button -->
+    <button class="submit-btn" type="submit" name="search_submit">Let Me Help You.</button>
+</form>
+
+
+    {% if ai_results %}
+        <div class="result-container">
+            <p class="ai-explanation">{{ ai_explanation|safe }}</p>
+            {% for rv in ai_results %}
+                <div class="rv-card">
+                    <p>{{ rv['YEAR'] }} {{ rv['MAKE'] }} {{ rv['MODEL'] }} {{ rv['MODEL_NUMBER'] or '' }}: ${{ "{:,}".format(rv['AVERAGE_PRICE']|int) }}</p>
+                        <span>Length: {{ rv['LENGTH'] }} ft</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% elif ai_explanation %}
+        <div class="result-container">
+            <p class="ai-explanation">{{ ai_explanation|safe }}</p>
+        </div>
+    {% endif %}
+
+    <script>
+        const startButton = document.getElementById('mic-button');
+
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        startButton.addEventListener('click', () => recognition.start());
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            document.querySelector('.prompt-input').value = transcript;
+        };
+
+
+        function speakResponse(text) {
+    const synth = window.speechSynthesis;
+    if (!synth || !text) return;
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'en-US';
+
+    const setVoiceAndSpeak = () => {
+        const voices = synth.getVoices();
+        const femaleVoice = voices.find(voice =>
+            voice.name.toLowerCase().includes('female') ||
+            voice.name.toLowerCase().includes('samantha') ||  // macOS
+            voice.name.toLowerCase().includes('zira') ||      // Windows
+            voice.gender === 'female'                          // Some browsers include this
+        );
+        if (femaleVoice) {
+            utter.voice = femaleVoice;
+        } else {
+            console.warn('No female voice found. Using default.');
+        }
+
+        synth.speak(utter);
+    };
+
+    // Some browsers delay voice availability
+    if (synth.getVoices().length === 0) {
+        synth.onvoiceschanged = setVoiceAndSpeak;
+    } else {
+        setVoiceAndSpeak();
+    }
+}
+
+
+
+        window.onload = () => {
+            setTimeout(() => {
+                const gptSpokenText = `{{ spoken_text|safe }}`;
+                if (gptSpokenText.trim()) speakResponse(gptSpokenText);
+            }, 300);
+        };
+    </script>
+</body>
+</html>
